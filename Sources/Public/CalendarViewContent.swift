@@ -184,6 +184,25 @@ public final class CalendarViewContent {
     return self
   }
 
+  /// Configures a per-row day height provider. When set, each row of days in a month can have a
+  /// different height. The closure receives the `Month` and the zero-based row index within that
+  /// month, and returns the height in points for days in that row.
+  ///
+  /// The `dayAspectRatio` should still be set to the maximum possible height (used for
+  /// `maxMonthHeight` calculations). The provider returns heights ≤ that maximum for rows that
+  /// need less space.
+  ///
+  /// - Parameters:
+  ///   - dayHeightProvider: A closure that returns the height for a given month and row index.
+  /// - Returns: A mutated `CalendarViewContent` instance with a day height provider.
+  public func dayHeightProvider(
+    _ dayHeightProvider: @escaping (_ month: Month, _ rowInMonth: Int) -> CGFloat)
+    -> CalendarViewContent
+  {
+    self.dayHeightProvider = dayHeightProvider
+    return self
+  }
+
   /// Configures the days-of-the-week row's separator options. The separator appears below the days-of-the-week row.
   ///
   /// - Parameters:
@@ -344,6 +363,7 @@ public final class CalendarViewContent {
   private(set) var monthDayInsets: UIEdgeInsets = .zero
   private(set) var verticalDayMargin: CGFloat = 0
   private(set) var horizontalDayMargin: CGFloat = 0
+  private(set) var dayHeightProvider: ((Month, Int) -> CGFloat)?
   private(set) var daysOfTheWeekRowSeparatorOptions: DaysOfTheWeekRowSeparatorOptions?
 
   // TODO(BK): Make all item provider closures private(set) after legacy `CalendarItem` is removed.
