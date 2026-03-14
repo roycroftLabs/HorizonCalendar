@@ -204,17 +204,6 @@ public final class CalendarView: UIView {
   ///   - content: The content to use when rendering `CalendarView`.
   ///   - animated: Whether or not the content update should be animated.
   public func setContent(_ content: CalendarViewContent, animated: Bool) {
-    if CalendarView._layoutLogCount < 30 {
-      let providerInfo = _visibleItemsProvider != nil ? "SET (cache=\(_visibleItemsProvider?.previousCalendarItemModelCache?.count ?? -1))" : "nil"
-      // Show caller chain to identify post-preLayout setContent sources
-      let frames = Thread.callStackSymbols
-      let caller = frames.count > 2 ? frames[1...min(3, frames.count-1)].map { frame in
-        // Extract just the function name from the stack frame
-        let parts = frame.components(separatedBy: " ").filter { !$0.isEmpty }
-        return parts.count > 3 ? parts[3] : frame
-      }.joined(separator: " → ") : "unknown"
-      print("⏱️ CalendarView.setContent: provider was \(providerInfo) | caller: \(caller)")
-    }
     let oldContent = self.content
 
     let isInAnimationClosure = UIView.areAnimationsEnabled && UIView.inheritedAnimationDuration > 0
@@ -319,8 +308,6 @@ public final class CalendarView: UIView {
     let savedBounds = bounds
     let savedScrollViewFrame = scrollView.frame
 
-    print("⏱️ preLayout ENTER: savedBounds=\(savedBounds.size), targetSize=\(size), hasProvider=\(_visibleItemsProvider != nil), hasScrollCtx=\(scrollToItemContext != nil), hasAnchor=\(anchorLayoutItem != nil)")
-
     bounds = CGRect(origin: .zero, size: size)
     scrollView.frame = bounds
 
@@ -339,9 +326,7 @@ public final class CalendarView: UIView {
 
     // Run a full layout pass — creates VisibleItemsProvider, computes frames,
     // and (crucially) creates ItemViews that persist in the reuse manager.
-    let t0 = CFAbsoluteTimeGetCurrent()
     _layoutSubviews(extendLayoutRegion: false)
-    print("⏱️ preLayout: _layoutSubviews took [\(String(format: "%.3f", CFAbsoluteTimeGetCurrent() - t0))s], hasProvider=\(_visibleItemsProvider != nil), cacheCount=\(_visibleItemsProvider?.previousCalendarItemModelCache?.count ?? -1)")
 
     // Restore original state. When the view is actually displayed, layoutSubviews()
     // runs with real bounds; if the size differs, the provider is recreated but the
@@ -567,7 +552,6 @@ public final class CalendarView: UIView {
   private var _scrollMetricsMutator: ScrollMetricsMutator?
 
   private var anchorLayoutItem: LayoutItem?
-  private static var _layoutLogCount = 0
   private var _visibleItemsProvider: VisibleItemsProvider?
   private var visibleItemsDetails: VisibleItemsDetails?
   private var visibleViewsForVisibleItems = [VisibleItem: ItemView]()
@@ -674,10 +658,6 @@ public final class CalendarView: UIView {
       // (not recreated) for the first open, giving direct cache hits.
       // For subsequent size changes (rotation etc.), fresh evaluation
       // is fast enough.
-      let hadProvider = _visibleItemsProvider != nil
-      if CalendarView._layoutLogCount < 30 {
-        print("⏱️ visibleItemsProvider: creating new (hadPrevious=\(hadProvider), oldSize=\(_visibleItemsProvider?.size ?? .zero), newSize=\(bounds.size))")
-      }
       let visibleItemsProvider = VisibleItemsProvider(
         calendar: calendar,
         content: content,
@@ -805,7 +785,9 @@ public final class CalendarView: UIView {
 
   // This exists so that we can force a layout ourselves in preparation for an animated update.
   private func _layoutSubviews(extendLayoutRegion: Bool) {
+    #if DEBUG
     let t0 = CFAbsoluteTimeGetCurrent()
+    #endif
     scrollView.performWithoutNotifyingDelegate {
       scrollMetricsMutator.setUpInitialMetricsIfNeeded()
       scrollMetricsMutator.updateContentSizePerpendicularToScrollAxis(viewportSize: bounds.size)
@@ -831,24 +813,22 @@ public final class CalendarView: UIView {
         visibleItemsProvider: visibleItemsProvider)
     }
 
-    let t1 = CFAbsoluteTimeGetCurrent()
     let currentVisibleItemsDetails = visibleItemsProvider.detailsForVisibleItems(
       surroundingPreviouslyVisibleLayoutItem: anchorLayoutItem,
       offset: scrollView.contentOffset,
       extendLayoutRegion: extendLayoutRegion)
     self.anchorLayoutItem = currentVisibleItemsDetails.centermostLayoutItem
-    let t2 = CFAbsoluteTimeGetCurrent()
 
     updateVisibleViews(withVisibleItems: currentVisibleItemsDetails.visibleItems)
-    let t3 = CFAbsoluteTimeGetCurrent()
 
     visibleItemsDetails = currentVisibleItemsDetails
 
-    let total = t3 - t0
-    if total > 0.01 || CalendarView._layoutLogCount < 30 {
-      CalendarView._layoutLogCount += 1
-      print("⏱️ _layoutSubviews[\(CalendarView._layoutLogCount)]: anchor[\(String(format: "%.3f", t1-t0))s] details[\(String(format: "%.3f", t2-t1))s] updateViews[\(String(format: "%.3f", t3-t2))s] TOTAL[\(String(format: "%.3f", total))s] items=\(currentVisibleItemsDetails.visibleItems.count) bounds=\(bounds.size)")
+    #if DEBUG
+    let elapsed = CFAbsoluteTimeGetCurrent() - t0
+    if elapsed > 0.05 {
+      print("⏱️ _layoutSubviews: \(String(format: "%.3f", elapsed))s (\(currentVisibleItemsDetails.visibleItems.count) items, bounds=\(bounds.size))")
     }
+    #endif
 
     let minimumScrollOffset = visibleItemsDetails?.contentStartBoundary.map {
       ($0 - firstLayoutMarginValue).alignedToPixel(forScreenWithScale: scale)
