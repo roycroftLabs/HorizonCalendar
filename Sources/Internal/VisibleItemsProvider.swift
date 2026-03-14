@@ -302,7 +302,7 @@ final class VisibleItemsProvider {
     _CalendarItemViewDifferentiator: UIView
   ]()
 
-  private var previousCalendarItemModelCache: [
+  var previousCalendarItemModelCache: [
     VisibleItem.ItemType: AnyCalendarItemModel
   ]?
 
