@@ -171,10 +171,10 @@ final class VisibleItemsProvider {
     if extendLayoutRegion {
       bounds = boundsForExtendedRegionUpdatePass(atOffset: offset)
     } else {
-      // Overscan by ~1 row beyond the visible viewport in both directions.
-      // This pre-configures cells just before they scroll into view, preventing
-      // the per-row "bump" caused by configuring 7 cells in a single frame.
-      let overscan: CGFloat = 100
+      // Overscan ~2 rows beyond the visible viewport in both directions.
+      // Pre-configures cells before they scroll into view, spreading
+      // HorizonCalendar's layout work across more frames.
+      let overscan: CGFloat = 200
       switch content.monthsLayout {
       case .vertical:
         bounds = CGRect(
