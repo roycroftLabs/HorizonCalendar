@@ -171,7 +171,24 @@ final class VisibleItemsProvider {
     if extendLayoutRegion {
       bounds = boundsForExtendedRegionUpdatePass(atOffset: offset)
     } else {
-      bounds = CGRect(origin: offset, size: size)
+      // Overscan by ~1 row beyond the visible viewport in both directions.
+      // This pre-configures cells just before they scroll into view, preventing
+      // the per-row "bump" caused by configuring 7 cells in a single frame.
+      let overscan: CGFloat = 100
+      switch content.monthsLayout {
+      case .vertical:
+        bounds = CGRect(
+          x: offset.x,
+          y: offset.y - overscan,
+          width: size.width,
+          height: size.height + overscan * 2)
+      case .horizontal:
+        bounds = CGRect(
+          x: offset.x - overscan,
+          y: offset.y,
+          width: size.width + overscan * 2,
+          height: size.height)
+      }
     }
 
     // `extendedBounds` is used to make sure that we're always laying out a continuous set of items,
